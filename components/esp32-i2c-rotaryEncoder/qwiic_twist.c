@@ -12,14 +12,13 @@ Author: P.S.M.Goossens
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_attr.h"
-#include "audio-board.h"
+
 #include <string.h>
 
 static const char *TAG = "QWIIC_TWIST";
 
 void qwiic_twist_task(void* pvParameters);
 
-static int volume = 0;
 static int r = 0;
 static int g = 255;
 
@@ -80,36 +79,6 @@ esp_err_t qwiic_twist_set_color(qwiic_twist_t* config, uint8_t r, uint8_t g, uin
 	xSemaphoreGive( config->xMutex );
 	
 	return err;
-}
-
-void set_volume_color(qwiic_twist_t* config){
-	volume = get_volume();
-
-	if(volume < 0){
-		ESP_LOGE(TAG, "Volume is not initiaised yet!");
-	}
-
-	if(volume == 50){
-		r = 255;
-		g = 255;
-
-	}else if(volume < 50 ){
-		r = RGB_STEP * volume;
-
-	} else if(volume > 50){
-		g = 255 - (RGB_STEP * volume);
-	}
-	
-	if(volume  == 0){
-		r = 0;
-		g = 255;
-	}
-	else if(volume == 100){
-		r = 255;
-		g = 0;
-	}
-	
-	qwiic_twist_set_color(config, r, g, 0);
 }
 
 /*
@@ -305,8 +274,6 @@ void qwiic_twist_task(void* pvParameters)
 	uint8_t result = 0;
 	esp_err_t err = 0;
 	int16_t movement = 0;
-
-	set_volume_color(config);
 	
     while (config->task_enabled) {
 		
@@ -316,9 +283,6 @@ void qwiic_twist_task(void* pvParameters)
 			ESP_LOGI(TAG, "Error in task: %d", err);
 		}
 		
-		if(get_volume() != volume){
-			set_volume_color(config);
-		}
 
 		// Check the result and fire callbacks
 		// Click event

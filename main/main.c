@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -21,12 +22,11 @@
 #include "smbus.h"
 #include "qwiic_twist.h"
 #include "i2c-lcd1602.h"
-#include "clock-sync.h"
 #include "esp_wifi.h"
 
 //components that we made
-#include "lcd-menu.h"
 #include "wifi-connect.h"
+#include "individueel-menu.h"
 
 #define MAINTAG "main"
 #define CLOCKTAG "clock"
@@ -68,9 +68,7 @@ static void component_init(void){
 
 }
 
-
-void menu_task(void * pvParameter)
-{
+void show_menu_task(void *pvParameter){
     menu = menu_create_menu();
 
     menu_display_welcome_message(menu);
@@ -78,15 +76,14 @@ void menu_task(void * pvParameter)
 
     qwiic_twist_start_task(qwiic_twist_rotary);
 
-
     while(1)
     {
         vTaskDelay(2500 / portTICK_RATE_MS);
     }
-
     menu_free_menu(menu);
     vTaskDelete(NULL);
 }
+
 
 char * toString(int number) {
     int length = snprintf(NULL, 0, "%d", number + 1);
@@ -122,18 +119,6 @@ void onMove(int16_t move_value){
     }
 }
 
-void rotary_task(void * pvParameter)
-{
-    qwiic_twist_start_task(qwiic_twist_rotary);
-    while(1){
-        vTaskDelay(1000 / portTICK_RATE_MS);
-    }
-
-    vTaskDelete(NULL);
-}
-
-
-
 
 void app_main()
 {
@@ -151,7 +136,8 @@ void app_main()
 
     //initialize the components
     component_init();
+    srand(time(0));
 
-    xTaskCreate(&menu_task, "menu_task", 4096, NULL, 5, NULL);
+    xTaskCreate(&show_menu_task, "show_menu_task", 4096, NULL, 5, NULL);
 }
 
