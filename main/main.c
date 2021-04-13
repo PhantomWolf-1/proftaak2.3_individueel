@@ -42,6 +42,7 @@ void clicked(void);
 void pressed(void);
 void onMove(int16_t);
 
+//setup the i2c
 void i2c_master_init(void)
 {
     int i2c_master_port = I2C_MASTER_NUM;
@@ -58,6 +59,7 @@ void i2c_master_init(void)
                        I2C_MASTER_TX_BUF_LEN, 0);
 }
 
+//sets the current components
 static void component_init(void){
     //INIT rotary encoder, and the qwiic_twist_init will set the oher settings for the rotary encoder
     qwiic_twist_rotary = (qwiic_twist_t*)malloc(sizeof(*qwiic_twist_rotary));
@@ -70,6 +72,7 @@ static void component_init(void){
     setup_player();
 }
 
+//the task where the program begins, this prints the menu and the items. Plus activates the spin when needed with a method.
 void show_menu_task(void *pvParameter){
     menu = menu_create_menu();
 

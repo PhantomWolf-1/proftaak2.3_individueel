@@ -14,17 +14,16 @@ int size_shop;
 int size_inventory;
 
 static enum catagory status;
-
 static void create_items(void);
 
 
-
+//in betwween method for the setup for the player
 void setup_player()
 {
     create_items();
 }
 
-
+//creates all the items
 static void create_items()
 {
     item item_0 = {"Candy", 25};
@@ -50,7 +49,7 @@ static void create_items()
     size_inventory = 0;
 }
 
-
+//buys the selected item, not used for now. Still in defelopment
 void buy_item()
 {
     item selected_item = shop_items[index_item];
@@ -68,7 +67,7 @@ void buy_item()
     }
 }
 
-
+//raises the index
 void raise_index()
 {
     index_item++;
@@ -94,6 +93,7 @@ void raise_index()
     }
 }
 
+//lowers the index
 void lower_index()
 {
     index_item--;
@@ -117,46 +117,43 @@ void lower_index()
     }
 }
 
+//gets the show size
 int get_shop_items_size()
 {
     return size_shop;
 }
 
+//gets the inventory size
 int get_inventory_items_size()
 {
     return size_inventory;
 }
 
+//set the current status, like shop or inventory
 void set_status(enum catagory new_status)
 {
     status = new_status;
 }
 
+//gets the current status, like in the shop or in the inventory
 enum catagory get_status(){
     return status;
 }
 
+//gives an amount of credits
 void give_credits(int value)
 {
     credits += value;
     ESP_LOGI("CREDITS", "credits: %d", credits);
 }
 
+//gets the current amount of creadits
 int get_credits()
 {
     return credits;
 }
 
-char **get_all_shop_item_names()
-{
-    char *names[size_shop];
-    for(int i = 0; i < size_shop; i++)
-    {
-        names[i] = shop_items[i].name;
-    }
-    return names;
-}
-
+// returns all the shop items
 item *get_all_shop_items(){
     return shop_items;
 }
