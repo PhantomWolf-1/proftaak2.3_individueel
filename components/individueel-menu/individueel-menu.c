@@ -1,20 +1,31 @@
 #include "individueel-menu.h"
+#include "individueel.h"
 #include "freertos/FreeRTOS.h"
 #include "esp_log.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define MENUTAG "menu"
 
 
 static i2c_lcd1602_info_t *_lcd_info;
 static menu_t *_menu;
-static unsigned int custom_chars[MAX_CUSTOM_CHARACTERS];
+unsigned int custom_chars[MAX_CUSTOM_CHARACTERS];
+
+int item_index = 0;
 
 void create_custom_characters(void);
 void menu_spin_slot(void);
 enum outcome calculate_win(unsigned int numbers[]);
-
+int calculate(unsigned int numbers[]);
+void menu_display_credits(void);
+void diplay_items(void);
+void next_item(void);
+void previous_item(void);
+void enter_item_list_shop(void);
+void enter_item_list_inventory(void);
 
 i2c_lcd1602_info_t * lcd_init(void){
     i2c_port_t i2c_num = I2C_MASTER_NUM;
@@ -50,20 +61,20 @@ menu_t *menu_create_menu(void){
 
     // Temporary array of menu items to copy from
     menu_item_t menuItems[MAX_MENU_ITEMS] = {
-        {MENU_MAIN_ID_0, {MENU_SLOTS_ID_0, MENU_MAIN_ID_2, MENU_MAIN_ID_1}, {"MAIN MENU", "Slots"}, {NULL, NULL, NULL}, NULL, NULL},
-        {MENU_MAIN_ID_1, {MENU_SHOP_ID_0, MENU_MAIN_ID_0, MENU_MAIN_ID_2}, {"MAIN MENU", "Shop"}, {NULL, NULL, NULL}, NULL, NULL},
-        {MENU_MAIN_ID_2, {MENU_INVENTORY_ID_0, MENU_MAIN_ID_1, MENU_MAIN_ID_0}, {"MAIN MENU", "Inventory"}, {NULL, NULL, NULL}, NULL, NULL},
+        {MENU_MAIN_ID_0, {MENU_SLOTS_ID_0, MENU_MAIN_ID_2, MENU_MAIN_ID_1}, {"MAIN MENU", "Slots"}, {NULL, NULL, NULL}, menu_display_credits, NULL},
+        {MENU_MAIN_ID_1, {MENU_SHOP_ID_0, MENU_MAIN_ID_0, MENU_MAIN_ID_2}, {"MAIN MENU", "Shop"}, {NULL, NULL, NULL}, menu_display_credits, NULL},
+        {MENU_MAIN_ID_2, {MENU_INVENTORY_ID_0, MENU_MAIN_ID_1, MENU_MAIN_ID_0}, {"MAIN MENU", "Inventory"}, {NULL, NULL, NULL}, menu_display_credits, NULL},
 
-        {MENU_SLOTS_ID_0, {MENU_SLOTS_ID_0, MENU_SLOTS_ID_1, MENU_SLOTS_ID_1}, {"SLOTS", "Spin"}, {menu_spin_slot, NULL, NULL}, NULL, NULL},
-        {MENU_SLOTS_ID_1, {MENU_MAIN_ID_0, MENU_SLOTS_ID_0, MENU_SLOTS_ID_0}, {"SLOTS", "Back"}, {NULL, NULL, NULL}, NULL, NULL}, 
+        {MENU_SLOTS_ID_0, {MENU_SLOTS_ID_0, MENU_SLOTS_ID_1, MENU_SLOTS_ID_1}, {"SLOTS", "Spin"}, {menu_spin_slot, NULL, NULL}, menu_display_credits, NULL},
+        {MENU_SLOTS_ID_1, {MENU_MAIN_ID_0, MENU_SLOTS_ID_0, MENU_SLOTS_ID_0}, {"SLOTS", "Back"}, {NULL, NULL, NULL}, menu_display_credits, NULL}, 
 
-        {MENU_SHOP_ID_0, {MENU_SHOP_ID_2, MENU_SHOP_ID_1, MENU_SHOP_ID_1}, {"SHOP", "Items"}, {NULL, NULL, NULL}, NULL, NULL},
-        {MENU_SHOP_ID_1, {MENU_MAIN_ID_1, MENU_SHOP_ID_0, MENU_SHOP_ID_0}, {"SHOP", "Back"}, {NULL, NULL, NULL}, NULL, NULL},
-        {MENU_SHOP_ID_2, {MENU_SHOP_ID_2, MENU_SHOP_ID_2, MENU_SHOP_ID_2}, {"ITEMS", " ", "", ""}, {NULL, NULL, NULL}, NULL, NULL},
+        {MENU_SHOP_ID_0, {MENU_SHOP_ID_2, MENU_SHOP_ID_1, MENU_SHOP_ID_1}, {"SHOP", "Items"}, {NULL, NULL, NULL}, menu_display_credits, NULL},
+        {MENU_SHOP_ID_1, {MENU_MAIN_ID_1, MENU_SHOP_ID_0, MENU_SHOP_ID_0}, {"SHOP", "Back"}, {NULL, NULL, NULL}, menu_display_credits, NULL},
+        {MENU_SHOP_ID_2, {MENU_SHOP_ID_2, MENU_SHOP_ID_2, MENU_SHOP_ID_2}, {"ITEMS", " ", "", ""}, {NULL, previous_item, next_item}, enter_item_list_shop, NULL},
 
-        {MENU_INVENTORY_ID_0, {MENU_INVENTORY_ID_2, MENU_INVENTORY_ID_1, MENU_INVENTORY_ID_1}, {"INVENTORY", "Items"}, {NULL, NULL, NULL}, NULL, NULL},
-        {MENU_INVENTORY_ID_1, {MENU_MAIN_ID_2, MENU_INVENTORY_ID_0, MENU_INVENTORY_ID_0}, {"INVENTORY", "Back"}, {NULL, NULL, NULL}, NULL, NULL},
-        {MENU_INVENTORY_ID_2, {MENU_INVENTORY_ID_2, MENU_INVENTORY_ID_2, MENU_INVENTORY_ID_2}, {"ITEMS", " ", "", ""}, {NULL, NULL, NULL}, NULL, NULL},
+        {MENU_INVENTORY_ID_0, {MENU_INVENTORY_ID_2, MENU_INVENTORY_ID_1, MENU_INVENTORY_ID_1}, {"INVENTORY", "Items"}, {NULL, NULL, NULL}, menu_display_credits, NULL},
+        {MENU_INVENTORY_ID_1, {MENU_MAIN_ID_2, MENU_INVENTORY_ID_0, MENU_INVENTORY_ID_0}, {"INVENTORY", "Back"}, {NULL, NULL, NULL}, menu_display_credits, NULL},
+        {MENU_INVENTORY_ID_2, {MENU_INVENTORY_ID_2, MENU_INVENTORY_ID_2, MENU_INVENTORY_ID_2}, {"ITEMS", " ", "", ""}, {NULL, NULL, NULL}, enter_item_list_inventory, NULL},
     };
     
     _lcd_info = lcd_init();
@@ -117,7 +128,7 @@ void menu_display_menu_item(menu_t *menu, int menuItemId)
     }
 }
 
-
+//writes a scroll menu item on the lcd
 void menu_write_scroll_menu_item(i2c_lcd1602_info_t *lcd_info, char* text, int line)
 {
     int textPosition = 0;
@@ -125,7 +136,7 @@ void menu_write_scroll_menu_item(i2c_lcd1602_info_t *lcd_info, char* text, int l
     i2c_lcd1602_write_string(lcd_info, text);
 }
 
-
+//displays a welcom message
 void menu_display_welcome_message(menu_t *menu)
 {
     i2c_lcd1602_set_cursor(menu->lcd_info, false);
@@ -139,7 +150,7 @@ void menu_display_welcome_message(menu_t *menu)
     i2c_lcd1602_clear(menu->lcd_info);
 }
 
-
+//displays scroll menu 
 void menu_display_scroll_menu(menu_t *menu)
 {
     i2c_lcd1602_clear(menu->lcd_info);
@@ -162,25 +173,93 @@ void menu_display_scroll_menu(menu_t *menu)
 
     // Display cursor
     const char *cursor = "<";
-    i2c_lcd1602_move_cursor(menu->lcd_info, 17, 2);
+    i2c_lcd1602_move_cursor(menu->lcd_info, 11, 2);
     i2c_lcd1602_write_string(menu->lcd_info, cursor);
 }
 
-static unsigned int get_random_number(){
+//displays the imtes for the shop and inventory, currently works only on the shop, by mechanism not implemented yet
+void display_items()
+{
+    i2c_lcd1602_clear(_menu->lcd_info);
+    char * menuText;
+    int previous_item_index, next_item_index;
+    item *all_items;
+
+    // Display scroll menu title
+    menuText = "SHOP";
+    menu_write_scroll_menu_item(_menu->lcd_info, menuText, 0);
+    switch(get_status())
+    {
+        case SHOP:
+            all_items = get_all_shop_items();
+            if(item_index + 1 >= get_shop_items_size + 1)
+            {
+                item_index = 0;
+            }
+            else if(item_index - 1 < -1)
+            {
+                item_index = get_shop_items_size;
+            }
+            previous_item_index = item_index - 1 < 0? get_shop_items_size() : item_index - 1;
+            menuText = all_items[previous_item_index].name;
+            menu_write_scroll_menu_item(_lcd_info, menuText, 1);
+
+            menuText = all_items[item_index].name;
+            menu_write_scroll_menu_item(_lcd_info, menuText, 2);
+
+            next_item_index = item_index + 1 > get_shop_items_size()? 0 : item_index + 1;
+            menuText = all_items[next_item_index].name;
+            menu_write_scroll_menu_item(_lcd_info, menuText, 3);  
+            break;
+        
+        case INVENTORY:
+            break;
+
+        default:
+            ESP_LOGI("STATUS", "NO STATUS!!!");
+            break;
+    }
+
+    // Display cursor
+    const char *cursor = "<";
+    i2c_lcd1602_move_cursor(_lcd_info, 11, 2);
+    i2c_lcd1602_write_string(_lcd_info, cursor);
+}
+
+//sets the index plus one for the scroll machanism
+void next_item()
+{
+    item_index++;
+    display_items();
+}
+
+//sets the index minus one for the scroll machanism
+void previous_item()
+{
+    item_index--;
+    display_items();
+}
+
+//gets a random number
+static unsigned int get_random_number()
+{
     int number = (rand() % (MAX_CUSTOM_CHARACTERS - LOW_CUSTOM_CHARACTERS + 1)) + LOW_CUSTOM_CHARACTERS;
     return number;
 }
 
+
+//lets the spin machine roll
 void menu_spin_slot()
 {
+    srand(time(0));
     unsigned int spins[MAX_SLOTS];
+    //gets the numbers that are rolled 
     for(int i = 0; i < MAX_SLOTS; i++)
     {
         for(int j = 0; j < SPIN_ROLLS; j++)
         {
-            i2c_lcd1602_move_cursor(_menu->lcd_info, (i * 2) + 10, 0);
+            i2c_lcd1602_move_cursor(_menu->lcd_info, (i * 2) + 13, 2);
             unsigned int random_number = get_random_number();
-            ESP_LOGI("RANDOM_NUMBER", "%d", random_number);
             vTaskDelay(TIME_BETWEEN_ROLLS / portTICK_RATE_MS);
             i2c_lcd1602_write_custom_char(_menu->lcd_info, custom_chars[random_number]);
             spins[i] = random_number;
@@ -188,88 +267,70 @@ void menu_spin_slot()
         vTaskDelay(TIME_BETWEEN_SPINS / portTICK_RATE_MS);
     }
 
-    enum outcome result;
-    result = calculate_win(spins);
-    
+    //calculates the amount of duplicates in the roll
+    int result = calculate(spins);
     switch(result)
     {
-        case LOSE:
-            
-            break;
-
-        case TINY_WIN: 
-            
-            break;
-
-        case BIG_WIN:
-            
-            break;
-
-        case ERROR: 
-            
-            break;
-
-        default:
-            ESP_LOGW("CALCULATE_SPIN", "WRONG OUTCOME!!!");
-            break;
-    }
-
-}
-
-
-enum outcome calculate_win(unsigned int numbers[])
-{
-    int arr[1000],i,j,count=0, min;
-    for(i = 0; i < MAX_SLOTS; i++)
-    {
-        min = i;
-        for(j = i + 1; j < MAX_SLOTS; j++)
-        {
-            if(arr[min]>arr[j])
-            {
-                min = j;    
-            }
-        }
-        {
-            int temp = arr[min];
-            arr[min] = arr[i];
-            arr[i] = temp;
-        }
-    }
-
-    for(i = 1; i < MAX_SLOTS; i++)
-    {
-        if(arr[i]==arr[i-1])
-        {
-            count++;
-            while(arr[i]==arr[i-1]) i++;
-        }
-    }
-
-    switch(count)
-    {
-        case 0:
-            return LOSE;
-            break;
-
         case 1: 
-            return LOSE;
+            give_credits(50);
             break;
 
         case 2:
-            return TINY_WIN;
-            break;
-
-        case 3: 
-            return BIG_WIN;
+            give_credits(100);
             break;
 
         default:
-            return ERROR;
+            ESP_LOGI("CALCULATE_SPIN", "no price!!!");
             break;
     }
+    //refreshes the credit count
+    menu_display_credits();
 }
 
+//calculates the duplicates
+int calculate(unsigned int numbers[])
+{
+    int counter = 0;
+    for (int i = 0; i < MAX_SLOTS; i++) {
+        for(int j = i+1; j < MAX_SLOTS; j++)
+        {
+            if(numbers[i] == numbers[j]){
+                counter++;
+            }
+        }
+    }
+    return counter;
+}
+
+//sets a number to a char[]
+static char * toString(int number) {
+    int length = snprintf(NULL, 0, "%d", number + 1);
+    char *str = malloc(length + 1);
+    snprintf(str, length + 1, "%d", number);
+    return str;
+}
+
+//displays the credit
+void menu_display_credits(void){
+    i2c_lcd1602_move_cursor(_menu->lcd_info, 15, 0);
+    i2c_lcd1602_write_string(_menu->lcd_info, toString(get_credits()));
+}
+
+//displays the correct things for the item list for the shop
+void enter_item_list_shop(){
+    set_status(SHOP);
+    display_items();
+    menu_display_credits();
+}
+
+//displays the correct things for the item list for the inventory
+void enter_item_list_inventory(){
+    set_status(INVENTORY);
+    display_items();
+    menu_display_credits();
+}
+
+//handles the key event
 void menu_handle_key_event(menu_t *menu, int key)
 {
     // If key press leads to the same ID as the currentMenuItemId
@@ -301,7 +362,7 @@ void menu_handle_key_event(menu_t *menu, int key)
     }
 }
 
-
+//creates the custom characters
 void create_custom_characters(void)
 {
     uint8_t diamond[8] = {
@@ -377,7 +438,7 @@ void create_custom_characters(void)
     custom_chars[4] = I2C_LCD1602_INDEX_CUSTOM_4;
     custom_chars[5] = I2C_LCD1602_INDEX_CUSTOM_5;
 
-
+    //define them in the open slots for xustom charcters
     i2c_lcd1602_define_char(_menu->lcd_info, I2C_LCD1602_INDEX_CUSTOM_0, diamond);
     i2c_lcd1602_define_char(_menu->lcd_info, I2C_LCD1602_INDEX_CUSTOM_1, cross);
     i2c_lcd1602_define_char(_menu->lcd_info, I2C_LCD1602_INDEX_CUSTOM_2, circle);
@@ -385,3 +446,4 @@ void create_custom_characters(void)
     i2c_lcd1602_define_char(_menu->lcd_info, I2C_LCD1602_INDEX_CUSTOM_4, plus);
     i2c_lcd1602_define_char(_menu->lcd_info, I2C_LCD1602_INDEX_CUSTOM_5, grail);
 }
+

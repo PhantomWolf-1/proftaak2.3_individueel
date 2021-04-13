@@ -76,5 +76,5 @@ void menu_display_menu_item(menu_t *menu, int menuItemId);
 void menu_handle_key_event(menu_t *menu, int key);
 
 void create_custom_characters(void);
-
+void display_items(void);
 #endif

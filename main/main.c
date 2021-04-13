@@ -26,6 +26,7 @@
 
 //components that we made
 #include "wifi-connect.h"
+#include "individueel.h"
 #include "individueel-menu.h"
 
 #define MAINTAG "main"
@@ -66,6 +67,7 @@ static void component_init(void){
     qwiic_twist_rotary->onMoved = &onMove;
     qwiic_twist_init(qwiic_twist_rotary);
 
+    setup_player();
 }
 
 void show_menu_task(void *pvParameter){
@@ -136,8 +138,7 @@ void app_main()
 
     //initialize the components
     component_init();
-    srand(time(0));
-
+   
     xTaskCreate(&show_menu_task, "show_menu_task", 4096, NULL, 5, NULL);
 }
 
